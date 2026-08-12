@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import numpy as np
 import unicodedata
 import re
+from sentence_transformers import CrossEncoder
 
 # Número de documentos recuperados por cada retriever
 RETRIEVAL_K = 8
@@ -52,6 +53,11 @@ class HybridRetriever:
         # Aumentamos K para a busca interna para o RRF ter mais "candidatos"
         self.vector_retriever = self.vectorstore.as_retriever(search_kwargs={"k": 50})
         self.bm25 = BM25Retriever.from_documents(chunks, preprocess_func=bm25_tokenizer, k=50)
+
+        # ── Cross-Encoder (Neural Re-ranker) ──
+        # Modelo leve e eficiente para re-ranking de alta precisão
+        print("--- Carregando Cross-Encoder (MiniLM)...")
+        self.reranker = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2', max_length=512)
 
     @staticmethod
     def _compute_fingerprint(chunks) -> str:
@@ -227,15 +233,23 @@ class HybridRetriever:
                         final_docs_pool.append(doc)
                         seen_contents.add(doc.page_content)
 
-        # 5. Injeção de Críticos (AAS, Notificação)
-        if found_critical:
-            for score, doc in sorted_docs[RETRIEVAL_K:]:
-                if any(t in doc.page_content.lower() for t in found_critical):
+        # 5. Injeção de Críticos (AAS, AINEs e Notificação)
+        safety_keywords = ["aspirina", "aas", "acetilsalicilico", "anti-inflamatorio", "aine", "ibuprofeno", "diclofenaco", "nimesulida", "corticosteroide", "corticoide", "prednisona", "sangramento", "hemorragia", "dipirona", "paracetamol"]
+        is_safety_relevant = found_critical or is_dosage_query or "dor" in query_lower or "eva" in query_lower or "dipirona" in query_lower or "paracetamol" in query_lower
+        
+        if is_safety_relevant:
+            for d in sorted_docs:
+                doc = d[1]
+                content_lower = doc.page_content.lower()
+                # Se o fragmento contém avisos sobre AAS ou AINEs
+                if any(t in content_lower for t in ["contraindicado", "evitar", "não deve ser utilizado", "risco de sangramento"]) and \
+                   any(t in content_lower for t in ["aas", "aspirina", "aine", "anti-inflamatório", "salicilato"]):
                     if doc.page_content not in seen_contents:
                         doc.metadata["safety_boost"] = True
+                        doc.metadata["gold_boost"] = True # Força para o topo
                         final_docs_pool.append(doc)
                         seen_contents.add(doc.page_content)
-                        if len(final_docs_pool) >= RETRIEVAL_K + 2: break
+                        if len(final_docs_pool) >= RETRIEVAL_K + 3: break
 
         # 6. Injeção de Dosagens
         if is_dosage_query:
@@ -275,15 +289,45 @@ class HybridRetriever:
                 
                 if len(final_docs_pool) >= RETRIEVAL_K + 10: break
 
-        # Normalização e Threshold
-        max_rrf = sorted_docs[0][0] if sorted_docs else 1.0
-        for doc in final_docs_pool:
-            raw_score = rrf_scores.get(doc.page_content, (0, doc))[0]
-            norm_score = raw_score / max_rrf if max_rrf > 0 else 0.0
-            if doc.metadata.get("safety_boost"):
-                norm_score = max(norm_score, 0.45) # Garante passagem no threshold
+        # ── NEURAL RE-RANKING (FILTRO FINAL) ──
+        # Usamos o Cross-Encoder para refinar a ordem do pool final (Top-K)
+        # Isso garante que a resposta mais semanticamente relevante suba para o topo
+        if final_docs_pool:
+            # Preparamos os pares (query, documento) para o Cross-Encoder
+            pairs = [[query, doc.page_content] for doc in final_docs_pool]
+            cross_scores = self.reranker.predict(pairs)
             
-            doc.metadata["relevance_score"] = float(norm_score)
-            doc.metadata["is_relevant"] = norm_score >= threshold
+            # Atualizamos os scores combinando a inteligência neural com os boosters de segurança
+            for i, doc in enumerate(final_docs_pool):
+                # Sigmoid para normalizar o score do Cross-Encoder entre 0 e 1 (aproximadamente)
+                neural_score = 1 / (1 + np.exp(-cross_scores[i]))
+                
+                # O score final é uma média ponderada: 70% Neural, 30% Heurística/RRF
+                # Mas mantemos o 'gold_boost' e 'safety_boost' com peso soberano
+                base_score = doc.metadata.get("relevance_score", 0.5)
+                
+                combined_score = (neural_score * 0.7) + (base_score * 0.3)
+                
+                if doc.metadata.get("gold_boost") or doc.metadata.get("safety_boost"):
+                    combined_score = max(combined_score, 0.9) # Prioridade máxima para segurança
+                
+                doc.metadata["relevance_score"] = float(combined_score)
+                doc.metadata["cross_score"] = float(neural_score)
+            
+            # Re-ordenamos o pool final com base no novo score combinado
+            final_docs_pool.sort(key=lambda x: x.metadata["relevance_score"], reverse=True)
+
+        # Normalização Final e Threshold
+        for doc in final_docs_pool:
+            norm_score = doc.metadata.get("relevance_score", 0.0)
+            
+            # Forçar relevância se houver match direto com termo da query
+            contains_query_term = False
+            for word in query_lower.replace("?", "").replace("!", "").replace(".", "").replace(",", "").split():
+                if len(word) > 3 and word in doc.page_content.lower():
+                    contains_query_term = True
+                    break
+            
+            doc.metadata["is_relevant"] = (norm_score >= threshold) or contains_query_term
 
         return final_docs_pool, SimpleNamespace(precision=1.0, recall=1.0, hit_rate=1.0, mrr=1.0, f1=1.0)

@@ -22,7 +22,7 @@ GENERATOR_MODEL = "gpt-4o-mini"
 # 1. "claude-sonnet-4-5"        (Ouro — padrão, mesmo preço do 3.5, geração mais recente)
 # 2. "claude-3-5-sonnet-latest" (Prata — fallback se 4.5 não estiver disponível)
 # 3. "gpt-4o"                   (Bronze — fallback se créditos Anthropic acabarem)
-JUDGE_MODEL = "claude-sonnet-4-5"
+JUDGE_MODEL = "gpt-4o"
 
 # ── Retry com Backoff Exponencial ─────────────────────────────────────────────
 def _retry(func, max_retries: int = 3, base_delay: float = 5.0):
@@ -67,7 +67,7 @@ class LLMEngine:
         self.model = model
         self._initialized = True
 
-    def generate(self, prompt: str, temperature: float = 0.1, system_prompt: str | None = None) -> str:
+    def generate(self, prompt: str, temperature: float = 0.1, system_prompt: str | None = None, stream: bool = False):
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
@@ -78,15 +78,18 @@ class LLMEngine:
                 model=self.model,
                 messages=messages,
                 temperature=temperature,
+                stream=stream
             )
+            if stream:
+                return response
             return response.choices[0].message.content
 
         return _retry(_call)
 
 
-def chat_openai(prompt: str, model: str = GENERATOR_MODEL, temperature: float = 0.1, system_prompt: str | None = None) -> str:
+def chat_openai(prompt: str, model: str = GENERATOR_MODEL, temperature: float = 0.1, system_prompt: str | None = None, stream: bool = False):
     engine = LLMEngine(model=model)
-    return engine.generate(prompt, temperature=temperature, system_prompt=system_prompt)
+    return engine.generate(prompt, temperature=temperature, system_prompt=system_prompt, stream=stream)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

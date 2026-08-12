@@ -13,6 +13,8 @@ import os
 import random
 from typing import Dict, List, Optional
 
+from langchain_openai import OpenAIEmbeddings
+
 from .llm import chat_openai, chat_judge, GENERATOR_MODEL, JUDGE_MODEL
 from .prompts import (
     GENERATOR_SYSTEM_PROMPT,
@@ -27,7 +29,7 @@ from .prompts import (
 
 # ── Configuração ──────────────────────────────────────────────────────────────
 # Agora herdados centralmente do llm.py
-JUDGE_APPROVAL_THRESHOLD = 4.0   # score médio mínimo (1–5) para aprovação (gold standard)
+JUDGE_APPROVAL_THRESHOLD = 90.0   # score médio mínimo (0-100) para aprovação (gold standard)
 
 # ── Persistência de tópicos recentes ─────────────────────────────────────────
 _TOPICS_FILE = os.path.join("output", "recent_topics.json")
@@ -49,6 +51,14 @@ class QAGenerator:
         self.judge_model     = judge_model
         self.judge_threshold = judge_threshold
         self.recent_topics: List[str] = self._load_topics()  # Persistido entre sessões
+        
+        # Inicializa embeddings para desduplicação semântica
+        self.embeddings = OpenAIEmbeddings()
+        if self.recent_topics:
+            print(f"  [init] Pré-computando embeddings de {len(self.recent_topics)} tópicos recentes...")
+            self.recent_topics_embeddings = self.embeddings.embed_documents(self.recent_topics)
+        else:
+            self.recent_topics_embeddings = []
 
     # ── Persistência de tópicos ───────────────────────────────────────────────
     @staticmethod
@@ -223,21 +233,23 @@ class QAGenerator:
             for qa in qas:
                 q_text = qa.get("question", "").strip()
                 
-                # ── Dedup Fuzzy Cross-Chunk (Global) ──
+                # ── Dedup Semântico Cross-Chunk (Global) ──
                 is_dup = False
-                for known in self.recent_topics:
-                    if self._get_similarity(q_text, known) > 0.75:
+                q_embedding = self.embeddings.embed_query(q_text)
+                for known_emb in self.recent_topics_embeddings:
+                    if self._cosine_similarity(q_embedding, known_emb) > 0.92:
                         is_dup = True
                         break
                 
                 if is_dup or q_text.lower() in seen_questions:
-                    print(f"  [dedup-cross] Ignorada (Fuzzy): {q_text[:80]}")
+                    print(f"  [dedup-cross] Ignorada (Semântica): {q_text[:80]}")
                     continue
                 
                 seen_questions.add(q_text.lower())
                 
                 # Adiciona ao histórico de tópicos (pergunta completa para melhor comparação fuzzy)
                 self.recent_topics.append(q_text)
+                self.recent_topics_embeddings.append(q_embedding)
 
                 qa["chunk_index"] = i
                 if hasattr(chunks[i], "metadata"):
@@ -457,6 +469,12 @@ class QAGenerator:
             for judged in judged_qas:
                 eval_result = judged.get("judge", {})
                 is_approved = eval_result.get("aprovado", False)
+                
+                # Check actual score mathematically to avoid LLM hallucination
+                score_medio = eval_result.get("score_medio", 0)
+                if score_medio < self.judge_threshold:
+                    is_approved = False
+                    
                 reason      = eval_result.get("reason", "")
 
                 if is_approved:
@@ -547,32 +565,30 @@ class QAGenerator:
 
         return valid
 
-    def _get_similarity(self, s1: str, s2: str) -> float:
-        """Calcula a similaridade de Jaccard entre duas frases."""
-        import re
-        def tokenize(text):
-            return set(re.findall(r'\w+', text.lower()))
-        
-        words1 = tokenize(s1)
-        words2 = tokenize(s2)
-        if not words1 or not words2: return 0.0
-        
-        intersection = words1.intersection(words2)
-        union = words1.union(words2)
-        return len(intersection) / len(union)
+    def _cosine_similarity(self, v1: List[float], v2: List[float]) -> float:
+        """Calcula a similaridade de cosseno entre dois vetores."""
+        dot_product = sum(a * b for a, b in zip(v1, v2))
+        norm_v1 = sum(a * a for a in v1) ** 0.5
+        norm_v2 = sum(b * b for b in v2) ** 0.5
+        if norm_v1 == 0 or norm_v2 == 0:
+            return 0.0
+        return dot_product / (norm_v1 * norm_v2)
 
     def _deduplicate_intra(self, qas: List[Dict]) -> List[Dict]:
-        """Remove duplicatas fuzzy dentro do mesmo batch de chunk."""
+        """Remove duplicatas semânticas dentro do mesmo batch de chunk."""
         result = []
+        result_embeddings = []
         for qa in qas:
             is_dup = False
             q_text = qa.get("question", "").strip()
-            for r_qa in result:
-                if self._get_similarity(q_text, r_qa["question"]) > 0.8:
+            q_embedding = self.embeddings.embed_query(q_text)
+            for r_emb in result_embeddings:
+                if self._cosine_similarity(q_embedding, r_emb) > 0.90:
                     is_dup = True
                     break
             if not is_dup:
                 result.append(qa)
+                result_embeddings.append(q_embedding)
             else:
                 print(f"  [dedup-intra] Pergunta redundante removida: {q_text[:50]}...")
         return result
