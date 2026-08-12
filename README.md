@@ -62,8 +62,8 @@ ChikungunyaQA is a multi-persona question and answer (QA) dataset in Brazilian P
 ### 1. Clone Repository & Install Dependencies
 
 ```bash
-git clone https://github.com/your-username/chikungunya-qa.git
-cd chikungunya-qa
+git clone https://github.com/denivalpujuca/ChikungunyaQA.git
+cd ChikungunyaQA
 pip install -r requirements.txt
 ```
 
