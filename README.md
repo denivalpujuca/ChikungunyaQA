@@ -11,23 +11,23 @@ This repository contains the official dataset, clinical source guidelines, and e
 
 ---
 
-## 📌 Repository Overview
+## Repository Overview
 
 ChikungunyaQA is a multi-persona question and answer (QA) dataset in Brazilian Portuguese (PT-BR), derived from official clinical management guidelines published by the Brazilian Ministry of Health and complementary regulatory documents. 
 
 ### Key Dataset Features
 - **1,262 High-Fidelity QA Pairs:** Fully grounded in official Brazilian Unified Health System (SUS) protocols.
 - **Multi-Persona Architecture:**
-  - 👨‍⚕️ **Physician (Médica):** 556 pairs (44.1%) — formal medical terminology, dosage guidelines, and clinical workflows.
-  - 🧍 **Patient (Paciente):** 581 pairs (46.0%) — layperson language, accessible terms, and general symptom identification.
-  - 🤝 **Caregiver (Cuidador):** 125 pairs (9.9%) — practical home care, monitoring warning signs, and patient support.
+  - **Physician (Médica):** 556 pairs (44.1%) — formal medical terminology, dosage guidelines, and clinical workflows.
+  - **Patient (Paciente):** 581 pairs (46.0%) — layperson language, accessible terms, and general symptom identification.
+  - **Caregiver (Cuidador):** 125 pairs (9.9%) — practical home care, monitoring warning signs, and patient support.
 - **Dual Validation:**
   - Automated evaluation via an independent LLM judge (**Claude Sonnet 4.5**, G-Eval mean score: 97.1/100).
   - Blinded human evaluation by healthcare professionals (**Physician** and **Physical Therapist**).
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 .
@@ -57,7 +57,7 @@ ChikungunyaQA is a multi-persona question and answer (QA) dataset in Brazilian P
 
 ---
 
-## ⚙️ Environment Setup & Installation
+## Environment Setup & Installation
 
 ### 1. Clone Repository & Install Dependencies
 
@@ -83,7 +83,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 ---
 
-## 🔄 Reproduction Guide
+## Reproduction Guide
 
 To reproduce the dataset creation, audit, and evaluation pipeline end-to-end:
 
@@ -95,7 +95,7 @@ python scripts/generate_gold_dataset.py
 
 ---
 
-## 📊 Dataset Specifications
+## Dataset Specifications
 
 ### 1. Full Research Format (`data/ChikungunyaQA.jsonl`)
 Contains complete multidimensional provenance metadata:
@@ -135,7 +135,7 @@ Preprocessed instruction format ready for direct SFT fine-tuning (LoRA, QLoRA, U
 
 ---
 
-## 📜 FAIR Principles Compliance
+## FAIR Principles Compliance
 
 ChikungunyaQA strictly adheres to FAIR data principles:
 - **Findable:** Permanent DOI [`10.5281/zenodo.20444766`](https://doi.org/10.5281/zenodo.20444766) and structured metadata schemas.
@@ -145,7 +145,7 @@ ChikungunyaQA strictly adheres to FAIR data principles:
 
 ---
 
-## ✍️ Citation
+## Citation
 
 If you use ChikungunyaQA or code from this repository, please cite our paper:
 
@@ -161,7 +161,7 @@ If you use ChikungunyaQA or code from this repository, please cite our paper:
 
 ---
 
-## ⚖️ License
+## License
 
 - **Dataset:** [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
 - **Source Code:** [MIT License](LICENSE)
