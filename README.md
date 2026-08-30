@@ -6,12 +6,12 @@
 
 This repository provides the dataset files and the reproduction pipeline for **ChikungunyaQA**, a clinical multi-persona QA dataset grounded in Brazilian official guidelines and regulatory documents.
 
-> 📖 **For detailed information on the dataset construction methodology, prompt engineering, automated G-Eval auditing, expert clinical validation, and statistical analyses, please refer to the full paper:**  
+> **For detailed information on the dataset construction methodology, prompt engineering, automated G-Eval auditing, expert clinical validation, and statistical analyses, please refer to the full paper:**  
 > **ChikungunyaQA: A Clinical Dataset of Questions and Answers on Chikungunya** (*Data, MDPI, 2026* — Article Under Review).
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 .
@@ -34,7 +34,7 @@ This repository provides the dataset files and the reproduction pipeline for **C
 
 ---
 
-## 🚀 How to Reproduce
+## How to Reproduce
 
 ### 1. Installation
 
@@ -69,7 +69,7 @@ Generated outputs will be saved to the `output/` folder.
 
 ---
 
-## 📊 Dataset Access
+## Dataset Access
 
 The validated dataset is available in the `data/` directory and on **[Zenodo (DOI: 10.5281/zenodo.21908616)](https://doi.org/10.5281/zenodo.21908616)**:
 
@@ -78,7 +78,7 @@ The validated dataset is available in the `data/` directory and on **[Zenodo (DO
 
 ---
 
-## ✍️ Citation
+## Citation
 
 If you use ChikungunyaQA in your research, please cite:
 
@@ -88,7 +88,7 @@ Article Under Review
 
 ---
 
-## ⚖️ License
+## License
 
 * **Dataset:** [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
 * **Code:** [MIT License](LICENSE)

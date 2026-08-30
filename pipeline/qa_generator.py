@@ -157,7 +157,7 @@ class QAGenerator:
 
         # Injeta no prompt apenas as personas habilitadas
         personas_str = " | ".join(
-            f"{'①' if p == 'Paciente' else '②' if p == 'Cuidador' else '③'} {p.upper()}"
+            f"[{p.upper()}]"
             for p in personas_ativas
         )
         prompt = QA_GENERATION_PROMPT.format(
@@ -388,7 +388,7 @@ class QAGenerator:
         if is_list_failure:
             # Extrai itens faltantes do feedback e passa como bloco destacado
             missing_block = (
-                f"\n⚠️ ITENS IDENTIFICADOS COMO FALTANTES PELO JUIZ:\n"
+                f"\n[AVISO] ITENS IDENTIFICADOS COMO FALTANTES PELO JUIZ:\n"
                 f"{judge_reason}\n\n"
                 f"Verifique CADA item acima no contexto e inclua na resposta "
                 f"TODOS que estiverem presentes no texto."
